@@ -153,31 +153,35 @@ def main():
     filename = args.filename
     base_filename, file_extension = os.path.splitext(filename)
     filename_translated = base_filename + "." + lang + file_extension
-    jsonfile = base_filename + "_process.json"
-
-    # 从文件中加载已经翻译的文本
-    translated_dict = {}
-    try:
-        with open(jsonfile, "r", encoding="utf-8") as f:
-            translated_dict = json.load(f)
-    except FileNotFoundError:
-        pass
-
-    try:
-        with open(jsonfile, "r", encoding="utf-8") as f:
-            translated_dict = json.load(f)
-    except FileNotFoundError:
-        pass
-
-    with open(filename, 'r', encoding='utf-8') as file:
-        text = file.read()
-
+    
     # 根据文件类型调用相应的函数
     if file_extension == '.srt' or file_extension == '.vtt':
         with open(filename, 'r', encoding='utf-8') as file:
             text = file.read()
     else:
         print("Unsupported file type")
+
+    # 从文件中加载已经翻译的文本
+    translated_dict = {}
+    jsonfile = base_filename + "_process.json"
+    try:
+        with open(jsonfile, "r", encoding="utf-8") as f:
+            translated_dict = json.load(f)
+    except FileNotFoundError:
+        pass
+
+    try:
+        with open(jsonfile, "r", encoding="utf-8") as f:
+            translated_dict = json.load(f)
+    except FileNotFoundError:
+        pass
+
+    subs = pyvtt.open(filename)
+    subs.clean_indexes()
+    subs.save(filename, include_indexes=True)
+
+    with open(filename, 'r', encoding='utf-8') as file:
+        text = file.read()
 
     # 将文本分成不大于1024字符的短文本list
     short_text_list = split_text(text)
@@ -194,8 +198,9 @@ def main():
         translated_text += f"{translated_short_text}\n\n"
         print(translated_short_text)
 
-    subs = pyvtt.open(filename)
+    
     subs_translated = pyvtt.from_string(translated_text)
+    subs_translated.clean_indexes()
     subs_translated.save(filename_translated, include_indexes=True)
 
     try:
