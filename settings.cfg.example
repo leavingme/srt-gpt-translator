@@ -1,9 +1,11 @@
 [option]
-#API key for OpenAI API
-openai-apikey = sk-
+#API key
+base-url = https://api.deepseek.com
+api-key = sk-
 
 #Target language for translation, e.g. "English", "Chinese", "Japanese"
-target-language = Chinese
+target-language = Simplified Chinese
+target-lang = zh-CN
 
 
 
