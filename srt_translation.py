@@ -228,7 +228,6 @@ def main():
 
         # 将当前短文本和翻译后的文本加入总文本中
         translated_text += f"{translated_short_text}\n\n"
-        print(translated_short_text)
 
     # 保存翻译后的字幕
     webvtt_translated = webvtt.from_string(translated_text)
