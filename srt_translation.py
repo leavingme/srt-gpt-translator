@@ -2,7 +2,7 @@
 
 import argparse
 import re
-import openai
+from openai import OpenAI
 from tqdm import tqdm
 # import nltk
 # nltk.download('punkt')
@@ -16,8 +16,7 @@ import configparser
 from io import StringIO
 import random
 import json
-import chat
-import pyvtt
+import webvtt
 import chardet
 
 # 初始化翻译后的文本
@@ -42,6 +41,34 @@ with open('settings.cfg', encoding=encoding) as f:
 language_name = config.get('option', 'target-language')
 lang = config.get('option', 'target-lang')
 
+base_url = config.get('option', 'base-url')
+api_key = config.get('option', 'api-key')
+
+# 设置API密钥
+client = OpenAI(api_key = api_key, base_url = base_url)
+
+
+# 创建参数解析器
+parser = argparse.ArgumentParser()
+parser.add_argument("filename", help="Name of the input file")
+parser.add_argument("--test", help="Only translate the first 3 short texts", action="store_true")
+args = parser.parse_args()
+
+# 获取命令行参数
+filename = args.filename
+base_filename, file_extension = os.path.splitext(filename)
+new_filenametxt = base_filename + "_translated.srt"
+new_filenametxt2 = base_filename + "_translated_bilingual.srt"
+
+jsonfile = base_filename + "_process.json"
+# 从文件中加载已经翻译的文本
+translated_dict = {}
+try:
+    with open(jsonfile, "r", encoding="utf-8") as f:
+        translated_dict = json.load(f)
+except FileNotFoundError:
+    pass
+
 
 def split_text(text):
     # 使用正则表达式匹配输入文本的每个字幕块（包括空格行）
@@ -65,7 +92,9 @@ def split_text(text):
     return short_text_list
 
 
+# 检查翻译结果的有效性；通过判断翻译前后的行数对比检测是否有效
 def is_translation_valid(original_text, translated_text):
+    
     def get_index_lines(text):
         lines = text.split('\n')
         index_lines = [line for line in lines if re.match(r'^\d+$', line.strip())]
@@ -89,21 +118,29 @@ def translate_text(text):
 
     while retries < max_retries:
         try:
-            prompt = f"You are a program responsible for translating subtitles and a chess expert. Translate the following subtitle text into {language_name}, Do not combine the subtitle content of the upper and lower lines together, keep the subtitle number and timeline unchanged. \n{text}"
-            print(prompt)
-            response = chat.create(prompt)
-            t_text = (
-                response
-                .get("content")
+            
+            prompt_system = f"You are a program responsible for translating subtitles and a chess expert."
+            prompt_user = f"Translate the following subtitle text into {language_name}, Do not combine the subtitle content of the upper and lower lines together, keep the subtitle number and timeline unchanged. \n{text}"
+            # print(prompt)
+
+            response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[
+                    {"role": "system", "content": prompt_system},
+                    {
+                        "role": "user",
+                        "content": prompt_user,
+                    }
+                ],
+                stream = False
             )
-
-            return t_text
-
-            # if is_translation_valid(text, t_text):
-            #     return t_text
-            # else:
-            #     retries += 1
-            #     print(f"Invalid translation format. Retrying ({retries}/{max_retries})")
+            t_text = response.choices[0].message.content
+            
+            if is_translation_valid(text, t_text):
+                return t_text
+            else:
+                retries += 1
+                print(f"Invalid translation format. Retrying ({retries}/{max_retries})")
 
         except Exception as e:
             import time
@@ -114,7 +151,6 @@ def translate_text(text):
 
     print(f"Unable to get a valid translation after {max_retries} retries. Returning the original text.")
     return text
-
 
 def translate_and_store(text):
     global translated_dict
@@ -128,11 +164,12 @@ def translate_and_store(text):
     translated_text = translate_text(text)
     translated_dict[text] = translated_text
 
-    # 将字典保存为 JSON 文件
+    # 将字典保存为临时的 JSON 文件
     with open(jsonfile, "w", encoding="utf-8") as f:
         json.dump(translated_dict, f, ensure_ascii=False, indent=4)
 
     return translated_text
+
 
 
 def main():
@@ -142,14 +179,13 @@ def main():
     global translated_dict
     global jsonfile
 
-
     # 创建参数解析器
     parser = argparse.ArgumentParser()
     parser.add_argument("filename", help="Name of the input file")
     parser.add_argument("--test", help="Only translate the first 3 short texts", action="store_true")
-    args = parser.parse_args()
 
     # 获取命令行参数
+    args = parser.parse_args()
     filename = args.filename
     base_filename, file_extension = os.path.splitext(filename)
     filename_translated = base_filename + "." + lang + file_extension
@@ -161,30 +197,26 @@ def main():
     else:
         print("Unsupported file type")
 
-    # 从文件中加载已经翻译的文本
-    translated_dict = {}
-    jsonfile = base_filename + "_process.json"
-    try:
-        with open(jsonfile, "r", encoding="utf-8") as f:
-            translated_dict = json.load(f)
-    except FileNotFoundError:
-        pass
+    # # 从文件中加载已经翻译的文本
+    # translated_dict = {}
+    # jsonfile = base_filename + "_process.json"
+    # try:
+    #     with open(jsonfile, "r", encoding="utf-8") as f:
+    #         translated_dict = json.load(f)
+    # except FileNotFoundError:
+    #     pass
 
-    try:
-        with open(jsonfile, "r", encoding="utf-8") as f:
-            translated_dict = json.load(f)
-    except FileNotFoundError:
-        pass
-
-    subs = pyvtt.open(filename)
-    subs.clean_indexes()
-    subs.save(filename, include_indexes=True)
-
-    with open(filename, 'r', encoding='utf-8') as file:
-        text = file.read()
+    # try:
+    #     with open(jsonfile, "r", encoding="utf-8") as f:
+    #         translated_dict = json.load(f)
+    # except FileNotFoundError:
+    #     pass
+    
+    # 标准化字幕文件，解决字幕文件可能没有序号的问题
+    captions = webvtt.read(filename)
 
     # 将文本分成不大于1024字符的短文本list
-    short_text_list = split_text(text)
+    short_text_list = split_text(captions.content)
 
     if args.test:
         short_text_list = short_text_list[:3]
@@ -198,10 +230,9 @@ def main():
         translated_text += f"{translated_short_text}\n\n"
         print(translated_short_text)
 
-    
-    subs_translated = pyvtt.from_string(translated_text)
-    subs_translated.clean_indexes()
-    subs_translated.save(filename_translated, include_indexes=True)
+    # 保存翻译后的字幕
+    webvtt_translated = webvtt.from_string(translated_text)
+    webvtt_translated.save(filename_translated)
 
     try:
         os.remove(jsonfile)
@@ -213,3 +244,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
