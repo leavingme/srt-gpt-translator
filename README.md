@@ -1,11 +1,9 @@
 # srt-GPT-translator
-[En](https://github.com/jesselau76/srt-gpt-translator/blob/main/README.md) | [中文说明](https://github.com/jesselau76/srt-gpt-translator/blob/main/README-zh.md)
-
-这个工具旨在帮助用户使用 LLM API 将 SRT 文件翻译成另一种语言。支持双语字幕输出。
+这个工具旨在帮助用户使用 LLM API 将 字幕文件（.srt, .vtt）翻译成另一种语言。支持双语字幕输出。
 
 ## 特点
 - 每次翻译为不超过1024字符的多个字幕块，以保持上下文的通畅
-- 加入了检测openai API翻译结果的机制，若格式与原文不对应，会重新翻译，翻译三次仍然不对，会返回那一部分短文本原文
+- 加入了检测翻译结果的机制，若格式与原文不对应，会重新翻译，翻译三次仍然不对，会返回那一部分短文本原文
 
 
 ## 安装
@@ -16,21 +14,10 @@
 
 `pip install -r requirements.txt` 
 
-克隆git
-
-`git clone https://github.com/jesselau76/srt-gpt-translator.git` 
-
-更新到新版本
-
-```
-cd srt-gpt-translator
-git pull
-pip install -r requirements.txt
-```
 
 ## 用法
 
-使用此工具，您需要首先将settings.cfg.example重命名为settings.cfg。
+使用此工具，您需要首先将 settings.cfg.example 重命名为 settings.cfg。
 
 ```
 cd srt-gpt-translator
@@ -70,11 +57,12 @@ options:
 
 `settings.cfg`文件包含几个选项，可用于配置脚本的行为：
 
--   `openai-apikey`：您的OpenAI API的API密钥。
--   `target-language`：您要将文本翻译成的语言（例如“英语”，“中文”，“日语”）。
+-   `base-url`：API Base URL
+-   `api-key`： API 密钥
+-   `target-language`：文本翻译成的语言，会应用在提示语中（例如：Simplified Chinese）。
+-   `target-lang`：语言区域代码，会应用在翻译后的文件名中（例如：zh-CN）。
 
 ## 输出
 
-脚本的输出将是两个文件：
-- 一个与输入文件同名的SRT文件，但在末尾添加了`_translated`。例如，如果输入文件是`example.srt`，则输出文件将为`example_translated.srt`。
-- 另一个为双语字幕文件，与输入文件同名的SRT文件，但在末尾添加了`_translated_bilingual`。例如，如果输入文件是`example.srt`，则输出文件将为`example_translated_bilingual.srt`。
+脚本的输出的文件：
+- 一个与输入文件同名的字幕文件，在文件名中添加了语言区域代码。例如：输入文件是`example.srt`，则输出文件将为`example.zh-CN.srt`。
